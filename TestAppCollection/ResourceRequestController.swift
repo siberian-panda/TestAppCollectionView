@@ -19,6 +19,9 @@ class ResourceRequestController: NSObject {
     public weak var delegate: ResourceRequestControllerDelegate?
     
     private var requestQueue = OperationQueue()
+    private var activeTask: URLSessionDataTask?
+    private var tasksArray: [URLSessionDataTask] = []
+    private var requestedIndexes: [Int] = []
     
     override init() {
         super.init()
@@ -29,6 +32,10 @@ class ResourceRequestController: NSObject {
     }
     
     public func loadResource(for itemIndex: Int) {
+        guard !requestedIndexes.contains(itemIndex) else {
+            return
+        }
+        requestedIndexes.append(itemIndex)
         requestQueue.addOperation {
             self._loadResource(for: itemIndex)
         }
@@ -43,7 +50,20 @@ class ResourceRequestController: NSObject {
         var request = URLRequest.init(url: url!)
         request.httpMethod = "GET"
         request.setValue("image/jpeg", forHTTPHeaderField: "Content-Type")
-        let task = URLSession.shared.dataTask(with: request) {(data, response, error) in
+        let session = URLSession.init(configuration: .default,
+                                      delegate: nil,
+                                      delegateQueue: nil)
+        let task = session.dataTask(with: request) {(data, response, error) in
+            defer {
+                self.requestedIndexes.removeFirst()
+                if let nextTask = self.tasksArray.first {
+                    self.tasksArray.removeFirst()
+                    self.activeTask = nextTask
+                    self.activeTask?.resume()
+                } else {
+                    self.activeTask = nil
+                }
+            }
             guard error == nil else {
                 self._sendDidFailToLoad(for: itemIndex, error: error! as NSError)
                 return
@@ -61,7 +81,12 @@ class ResourceRequestController: NSObject {
             }
             self._sendDidLoad(data: data, for: itemIndex)
         }
-        task.resume()
+        if activeTask == nil {
+            activeTask = task
+            activeTask?.resume()
+        } else {
+            tasksArray.append(task)
+        }
     }
     
     private func _sendDidLoad(data: Data, for itemIndex: Int) {

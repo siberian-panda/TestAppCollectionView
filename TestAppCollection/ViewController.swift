@@ -44,14 +44,30 @@ class ViewController: UIViewController {
     }
     
     public func removeItem(at indexPath: IndexPath) {
-        _collectionView?.performBatchUpdates {
-            self._dataSource.remove(at: indexPath.item)
-            self._collectionView?.deleteItems(at: [indexPath])
-        } completion: { flag in
-            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5) {
-                self._sendDidUpdateVisibleItemsIndexPathes()
+        UIView.animate(withDuration: 0.3, animations: {
+            if let cell = self._collectionView?.cellForItem(at: indexPath) as? CollectionViewCell {
+                cell.frame = CGRect(x: cell.frame.maxX + CollectionViewSizing.itemInset,
+                                    y: cell.frame.origin.y,
+                                    width: cell.frame.width,
+                                    height: cell.frame.height)
             }
-        }
+        }, completion: { _ in
+            self._collectionView?.performBatchUpdates {
+                self._dataSource.remove(at: indexPath.item)
+                self._collectionView?.deleteItems(at: [indexPath])
+            } completion: { flag in
+                DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5) {
+                    self._sendDidUpdateVisibleItemsIndexPathes()
+                }
+            }
+        })
+    }
+    
+    public func reloadData() {
+        _collectionView?.reloadData()
+        DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.5, execute: {
+            self._sendDidUpdateVisibleItemsIndexPathes()
+        })
     }
     
     // MARK: - Private

@@ -15,7 +15,7 @@ class ResourceManager: NSObject {
     private var viewController: ViewController?
     private var resourceList: [String] = []
     
-    init(with viewController: ViewController) {
+    override init() {
         super.init()
         
         _resetResourcesData()
@@ -23,9 +23,25 @@ class ResourceManager: NSObject {
         
         self.requestController.delegate = self
         
+        _handleViewController()
+    }
+    
+    private func _handleViewController() {
+        if let navigationController = UIApplication.shared.keyWindow?.rootViewController as? UINavigationController,
+           let rootViewController = navigationController.viewControllers.first as? ViewController {
+            _setupViewController(viewController: rootViewController)
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: DispatchTime.now() + 0.1, execute: {
+                self._handleViewController()
+            })
+        }
+    }
+    
+    private func _setupViewController(viewController: ViewController) {
         self.viewController = viewController
         self.viewController?.delegate = self
         self.viewController?.dataSource = resourcesData
+        self.viewController?.reloadData()
     }
     
     private func _resourceName(for itemIndex: Int) -> String {
@@ -137,9 +153,9 @@ extension ResourceManager: ViewControllerDelegate {
             if resourceList.count > indexPath.item, resourcesData.count > indexPath.item,
                let data = fileManager.readResourceFile(with: resourceList[indexPath.item]) {
                 _updateResourcesData(itemIndex: indexPath.item, image: UIImage(data: data), error: nil)
-            } else {
-                requestController.loadResource(for: indexPath.item)
+                continue
             }
+            requestController.loadResource(for: indexPath.item)
         }
     }
     
